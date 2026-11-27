@@ -1,0 +1,5 @@
+# Terraform 本地缓存与状态文件不入库
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
