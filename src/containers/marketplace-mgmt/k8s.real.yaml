@@ -1,0 +1,68 @@
+# Marketplace 订阅管理部署清单（CCE）
+# 应用方式：kubectl apply -f k8s.yaml
+# 说明：Service 以 NodePort 暴露（端口 30081），供私有 ELB 后端成员转发。
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: marketplace-mgmt-config
+  namespace: default
+data:
+  KAFKA_BOOTSTRAP_SERVERS: "10.0.2.73,10.0.2.195,10.0.2.40"
+  POLICY_COLLECTION: "policy_rules"
+  MONGO_CONNECTION: "mongodb://rwuser:do2AbEkqWjzfdgqph6f*@10.0.2.216:8635,10.0.2.224:8635,10.0.2.12:8635/admin?replicaSet=replica&authSource=admin"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: marketplace-mgmt
+  namespace: default
+  labels:
+    app: marketplace-mgmt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: marketplace-mgmt
+  template:
+    metadata:
+      labels:
+        app: marketplace-mgmt
+    spec:
+      imagePullSecrets:
+        - name: swr-cred
+      containers:
+        - name: marketplace-mgmt
+          image: "swr.cn-north-4.myhuaweicloud.com/vehicle-tracking/marketplace-mgmt:latest"
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: marketplace-mgmt-config
+          resources:
+            requests:
+              cpu: "0.25"
+              memory: "256Mi"
+            limits:
+              cpu: "0.25"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: marketplace-mgmt-svc
+  namespace: default
+spec:
+  type: NodePort
+  selector:
+    app: marketplace-mgmt
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      nodePort: 30081
